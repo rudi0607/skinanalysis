@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AyusKARA - AI Skin & Hair Analysis</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" defer></script>
+    <!-- jsPDF for PDF export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .chat-bubble { opacity: 0; transform: translateY(12px); animation: slideUp 0.36s forwards; }
+        @keyframes slideUp { to { opacity: 1; transform: translateY(0); } }
+        .loading-dots span { animation: blink 1.4s infinite both; }
+        .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes blink { 0%, 80%, 100% { opacity: 0; } 40% { opacity: 1; } }
+        #camera-modal { transition: opacity 0.22s ease-in-out; }
+        .gemini-content h1, .gemini-content h2, .gemini-content h3 { font-size: 1.05rem; font-weight: 600; margin-top: 0.5rem; margin-bottom: 0.25rem; }
+        .gemini-content ul { list-style-type: disc; padding-left: 1.5rem; }
+        .remedy-item { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
+        .youtube-btn { flex-shrink: 0; padding: 6px 10px; font-size: 0.78rem; background-color: #f7f7f7; border: 1px solid #e5e7eb; border-radius: 8px; cursor: pointer; transition: background-color 0.15s; }
+        .youtube-btn:hover { background-color: #f0f0f0; }
+        .small-btn { padding:6px 8px; font-size:0.75rem; border-radius:6px; }
+        .disabled { opacity: 0.5; pointer-events: none; }
+    </style>
+</head>
+<body class="bg-emerald-50 text-gray-800">
+    <div class="container mx-auto p-4 md:p-8 max-w-6xl">
+        <header class="text-center mb-8">
+            <div class="flex justify-center items-center gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-emerald-600"><path d="M12 2a5 5 0 0 0-5 5c0 1.66.84 3.12 2.1 4H5c-1.1 0-2 .9-2 2v2c0 1.1.9 2 2 2h2.9a5 5 0 0 0 7 0H19c1.1 0 2-.9 2-2v-2c0-1.1-.9-2-2-2h-4.1A5 5 0 0 0 12 2zM7 17v.01"></path></svg>
+                <h1 class="text-4xl md:text-5xl font-bold text-emerald-800">AyusKARA</h1>
+            </div>
+            <p class="mt-2 text-lg text-emerald-700">Aapka AI Ayurvedic sahayak, skin aur hair wellness ke liye.</p>
+        </header>
+
+        <main class="bg-white rounded-2xl shadow-lg p-4 md:p-8">
+            <div class="grid md:grid-cols-2 gap-8">
+                <div class="flex flex-col items-center justify-center border-2 border-dashed border-emerald-200 rounded-xl p-6">
+                    <div id="upload-area">
+                        <h2 class="text-2xl font-semibold text-emerald-800 mb-4 text-center">Apni Skin Analyze Karein</h2>
+                        <div class="w-48 h-48 mx-auto mb-4 rounded-full bg-emerald-100 flex items-center justify-center overflow-hidden">
+                            <img id="image-preview" src="" class="hidden w-full h-full object-cover rounded-full" alt="Uploaded skin preview">
+                            <svg id="upload-icon" xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-emerald-500"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                        </div>
+                        <div class="text-center bg-amber-100 border-l-4 border-amber-500 text-amber-700 p-3 rounded-md mb-4 text-sm">
+                            <p><strong>Photo Tip:</strong> Behtar result ke liye, saaf photo ka istemal karein jo natural light mein li gayi ho. Makeup ya chashme jaisi cheezon se bachein.</p>
+                        </div>
+                        <p class="text-center text-emerald-600 mb-4">Apni skin ki samasya ka photo upload karein ya lein.</p>
+                        <input type="file" id="image-upload" class="hidden" accept="image/*" aria-label="Upload skin photo">
+                        <!-- Fallback input that hints to devices to open camera (mobile) -->
+                        <input type="file" id="camera-fallback-input" class="hidden" accept="image/*" capture="environment" aria-label="Take photo (fallback)">
+
+                        <div class="flex gap-4 w-full">
+                            <button id="upload-btn" class="w-full bg-emerald-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-emerald-700 transition-colors duration-300">Photo Upload Karein</button>
+                            <button id="open-camera-btn" class="w-full bg-emerald-700 text-white font-semibold py-3 px-6 rounded-lg hover:bg-emerald-800 transition-colors duration-300 flex items-center justify-center gap-2"> <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg> Photo Lein</button>
+                        </div>
+                    </div>
+                    <div id="analysis-in-progress" class="hidden text-center">
+                        <h2 class="text-2xl font-semibold text-emerald-800 mb-4">Analysis ho raha hai...</h2>
+                        <div class="relative w-48 h-48 mx-auto">
+                            <div class="absolute inset-0 border-4 border-emerald-200 rounded-full"></div>
+                            <div class="absolute inset-0 border-4 border-t-emerald-600 rounded-full animate-spin"></div>
+                             <img id="analysis-preview" src="" class="w-full h-full object-cover rounded-full" alt="Analyzing skin preview">
+                        </div>
+                        <p class="mt-4 text-emerald-600">Hamara AI aapki skin type, tone, aur samasyaon ka vishleshan kar raha hai.</p>
+                    </div>
+                </div>
+
+                <div class="bg-emerald-50 rounded-xl p-4 flex flex-col h-[600px]">
+                    <div id="chat-window" class="flex-1 overflow-y-auto space-y-4 pr-2" role="log" aria-live="polite"></div>
+                    <div id="chat-input-area" class="mt-4"></div>
+                </div>
+            </div>
+
+            <div class="mt-8 text-center text-xs text-gray-500">
+                <p><strong>Disclaimer:</strong> AyusKARA ek final year project ka pradarshan hai aur is live version ke liye ek simulated AI ka upyog karta hai. Yahan di gayi jaankari aur sujhav sirf soochana ke liye hain aur kisi bhi tarah se professional medical advice ka vikalp nahi hain. Kisi bhi medical condition ke liye hamesha apne doctor se salah lein.</p>
+            </div>
+        </main>
+    </div>
+
+    <div id="camera-modal" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-4 rounded-lg shadow-xl w-full max-w-lg">
+            <video id="camera-feed" class="w-full rounded-md bg-black" autoplay playsinline aria-label="Camera feed"></video>
+            <div class="mt-4 flex justify-around gap-4">
+                <button id="capture-btn" disabled class="w-full bg-emerald-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-emerald-700 transition-colors duration-300 disabled:opacity-50">Capture</button>
+                <button id="close-camera-btn" class="w-full bg-gray-300 text-gray-800 font-semibold py-3 px-6 rounded-lg hover:bg-gray-400 transition-colors duration-300">Cancel</button>
+            </div>
+            <p id="camera-hint" class="mt-2 text-xs text-gray-500">(Agar camera ready nahi hota hai to aap fallback se photo le sakte hain.)</p>
+        </div>
+    </div>
+    <canvas id="photo-canvas" class="hidden"></canvas>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- DOM Elements ---
+        const chatWindow = document.getElementById('chat-window');
+        const chatInputArea = document.getElementById('chat-input-area');
+        const uploadArea = document.getElementById('upload-area');
+        const analysisInProgressArea = document.getElementById('analysis-in-progress');
+        const imagePreview = document.getElementById('image-preview');
+        const analysisPreview = document.getElementById('analysis-preview');
+        const uploadIcon = document.getElementById('upload-icon');
+        const cameraModal = document.getElementById('camera-modal');
+        const cameraFeed = document.getElementById('camera-feed');
+        const photoCanvas = document.getElementById('photo-canvas');
+        const uploadBtn = document.getElementById('upload-btn');
+        const openCameraBtn = document.getElementById('open-camera-btn');
+        const captureBtn = document.getElementById('capture-btn');
+        const closeCameraBtn = document.getElementById('close-camera-btn');
+        const cameraFallbackInput = document.getElementById('camera-fallback-input');
+        const fileInput = document.getElementById('image-upload');
+
+        let analysisResult = {};
+        let quizAnswers = {};
+        let currentQuizQuestion = 0;
+        let cameraStream = null;
+        let lastLoadingBubble = null;
+
+        // --- Data --- (kept same as before)
+        const skinIssuesData = {
+            'Acne & Blemishes': {
+                description: "Yeh samasya acne se judi lagti hai, jismein sujan aur pores band ho jaate hain. Iska kaaran Pitta dosha ka asantulan ho sakta hai.",
+                likelyDosha: "Pitta",
+                products: ['Salicylic Acid Cleanser', 'Tea Tree Oil Spot Treatment', 'Lightweight, Non-Comedogenic Moisturizer'],
+                remedies: [
+                    { name: "Neem & Turmeric Paste", desc: "Neem powder aur ek chutki haldi ko gulab jal ke saath milayein. Prabhavit jagah par 15 minute ke liye lagayein aur dho lein. Yeh dono jadi-butiyan anti-bacterial aur anti-inflammatory guno ke liye jaani jaati hain." },
+                    { name: "Sandalwood & Rose Water", desc: "Chandan powder aur gulab jal ka paste banakar sujan wali skin ko thandak dein. Raat bhar spot treatment ke roop mein lagayein." }
+                ],
+                databaseRemedies: ["Vasant Kusumakar Ras","Suhunjana Beej","Jahar Mohra Pishti","Akik Pishti"],
+                lifestyleTips: ["Roj subah khali pet ek glass gunguna paani piyein.", "Deep breathing (Pranayama) roz 5 minute karein.", "Zyada tel-masaledar khana kam karein."]
+            },
+            'Dryness & Dehydration': {
+                description: "Aapki skin mein dryness aur nami ki kami dikh rahi hai, jo aksar Vata dosha ke badhne se juda hota hai.",
+                likelyDosha: "Vata",
+                products: ['Hyaluronic Acid Serum', 'Ceramide-rich Moisturizing Cream', 'Gentle Milky Cleanser'],
+                remedies: [
+                    { name: "Honey & Milk Mask", desc: "Ek chammach shahad ko do chammach doodh mein milayein. Gehre hydration ke liye chehre par 20 minute tak lagayein." },
+                    { name: "Almond Oil Massage", desc: "Raat ko sone se pehle badam tel ki kuch boondon se skin par halke haath se massage karein. Yeh Vitamin E se bharpoor aur gehra poshan deta hai." }
+                ],
+                databaseRemedies: [],
+                lifestyleTips: ["Din bhar pani peete rahein (kam se kam 2-3 liter agar possible ho)", "Gentle exfoliation mahine mein 1 baar karein."]
+            },
+            'Psoriasis': {
+                description: "Yeh Psoriasis lag raha hai, ek autoimmune samasya jisse skin cells tezi se badhte hain. Iska sambandh aksar Pitta aur Kapha ke asantulan se hota hai.",
+                likelyDosha: "Pitta",
+                products: ['Coal Tar Shampoo', 'Salicylic Acid Ointment', 'Corticosteroid Creams (doctor se salah lein)'],
+                remedies: [
+                    { name: "Turmeric and Water", desc: "Sujan kam karne ke liye rozana ek chammach haldi garam paani ke saath lein." },
+                    { name: "Aloe Vera Gel", desc: "Lalima aur khujli ko shaant karne ke liye prabhavit jagahon par taaza aloe vera gel lagayein." }
+                ],
+                databaseRemedies: ["Giloy Satya","Boswellia Curcumin","Kamdhudha Ras","Ricinus Communis (Castor Oil - bahari upyog ke liye)"],
+                lifestyleTips: ["Thanda aur moist environment maintain karein.", "Stress kam karne ke liye meditation shamil karein."]
+            }
+        };
+
+        const quizQuestions = [
+            { question: "Aapke sharir ka natural frame kaisa hai?", options: { "Vata": "Patla, halka frame", "Pitta": "Medium, aakarshak frame", "Kapha": "Bhaari, mazboot frame" } },
+            { question: "Aapki bhookh aur pachan kaisa hai?", options: { "Vata": "Aniyamit, badalta rehta hai", "Pitta": "Tez, prachand", "Kapha": "Dheema, sthir" } },
+            { question: "Aap tanav mein kaise react karte hain?", options: { "Vata": "Chintit aur pareshan ho jaate hain", "Pitta": "Chidchide aur gussa ho jaate hain", "Kapha": "Shaant aur chup ho jaate hain" } },
+            { question: "Aapki aam skin type (jab aamtaur par theek ho) kaisi hai?", options: { "Vata": "Dry, patli, thandi", "Pitta": "Sensitive, garam, lalima-prone", "Kapha": "Oily, moti, thandi" } }
+        ];
+
+        function clearLoading() {
+            if (lastLoadingBubble && lastLoadingBubble.parentElement) {
+                lastLoadingBubble.parentElement.removeChild(lastLoadingBubble);
+                lastLoadingBubble = null;
+            }
+        }
+
+        function searchYoutubeShort(remedyName) {
+            const query = encodeURIComponent(`${remedyName} ayurvedic remedy short`);
+            const url = `https://www.youtube.com/results?search_query=${query}`;
+            window.open(url, '_blank');
+        }
+
+        function embedYoutubeShort(remedyName) {
+            const query = encodeURIComponent(`${remedyName} ayurvedic remedy`);
+            const iframe = `<iframe width="100%" height="250" src="https://www.youtube.com/embed?listType=search&list=${query}" frameborder="0" allowfullscreen title="YouTube Shorts: ${remedyName}"></iframe>`;
+            addMessage(`<div class="bg-gray-50 rounded-lg p-2">${iframe}</div>`);
+        }
+
+        function toggleSaveRemedy(remedy) {
+            const key = 'ayus_saved_remedies_v1';
+            let saved = JSON.parse(localStorage.getItem(key) || '[]');
+            const idx = saved.indexOf(remedy);
+            if (idx === -1) {
+                saved.push(remedy);
+                localStorage.setItem(key, JSON.stringify(saved));
+                addMessage(`<div class="p-2 text-sm text-green-700 bg-green-50 rounded">"${remedy}" saved to your remedies list.</div>`);
+            } else {
+                saved.splice(idx,1);
+                localStorage.setItem(key, JSON.stringify(saved));
+                addMessage(`<div class="p-2 text-sm text-amber-700 bg-amber-50 rounded">"${remedy}" removed from saved list.</div>`);
+            }
+        }
+
+        async function downloadPDF(issue, remedies) {
+            try {
+                const { jsPDF } = window.jspdf || {};
+                if (!jsPDF) throw new Error('jsPDF not loaded');
+                const doc = new jsPDF();
+                doc.setFontSize(14);
+                doc.text(`AyusKARA - Remedies for ${issue}`, 14, 20);
+                doc.setFontSize(11);
+                let y = 30;
+                remedies.forEach((r, i) => {
+                    const lines = doc.splitTextToSize(`${i+1}. ${r.name}: ${r.desc}`, 180);
+                    doc.text(lines, 14, y);
+                    y += (lines.length * 7) + 4;
+                    if (y > 270) { doc.addPage(); y = 20; }
+                });
+                doc.save(`${issue.replace(/\s+/g,'_')}_AyusKARA_Remedies.pdf`);
+            } catch (e) {
+                console.error('PDF error', e);
+                addMessage('<div class="p-2 text-sm text-red-700 bg-red-50 rounded">PDF download failed. Kripya browser console check karein.</div>');
+            }
+        }
+
+        // --- SIMULATED Gemini functions (kept local) ---
+        async function generateAyurvedicInsights() {
+            addMessage("✨ Ayurvedic Insights generate ho rahe hain...", true);
+            clearInput(); showLoading();
+            const issue = analysisResult.issue;
+            const likelyDosha = skinIssuesData[issue].likelyDosha;
+            clearLoading();
+            const simulatedInsights = `Ayurveda ke anusaar, '${issue}' jaisi samasya aksar '${likelyDosha}' dosha ke asantulan se judi hoti hai. Sahi aahar aur dincharya se isse santulit kiya ja sakta hai.`;
+            setTimeout(() => {
+                addMessage(`<div class="gemini-content p-2 bg-emerald-100 rounded-md border-l-4 border-emerald-500">${simulatedInsights}</div>`);
+                setTimeout(() => {
+                    addMessage("Aapko sabse achhe sujhav dene ke liye, main aapke sharir ke prakriti (*dosha*) ke anusaar Ayurvedic upchar bhi bata sakta hoon. Kya aap apne dominant dosha ko janne ke liye kuch sawalon ke jawab dena chahenge?");
+                    showButtons([
+                        { text: "Haan, mera Dosha batayein", action: startQuiz },
+                        { text: "Nahi, sirf basic tips dein", action: () => displayResults(analysisResult.issue, null) }
+                    ]);
+                }, 800);
+            }, 900);
+        }
+
+        async function generatePersonalizedPlan() {
+            addMessage("✨ Personalized plan banaya ja raha hai...", true);
+            clearInput(); showLoading();
+            const issue = analysisResult.issue;
+            const dosha = analysisResult.dosha || 'Prakriti';
+            clearLoading();
+            const simulatedPlan = `### Subah ka Routine\n* Uthte hi ek glass gunguna paani.\n* 5 minute pranayama.\n\n### Khan-paan ke Tips\n* Yeh Khayein: Mausami phal, paki sabziyan.\n* Isse Bachein: Zyada masaledar aur tel wala khana.\n\n### Shaam ka Routine\n* Sone se pehle halki stretching aur nariyal tel se pairo ka massage.`;
+            const formattedPlan = marked.parse(simulatedPlan);
+            setTimeout(() => {
+                addMessage(`<div class="gemini-content bg-white p-4 rounded-lg shadow-sm"><h4 class="font-bold text-emerald-800 mb-2">Aapka Personalized Ayurvedic Plan ✨</h4>${formattedPlan}</div>`);
+                setTimeout(showGeneralTips, 600);
+            }, 900);
+        }
+
+        // --- Camera logic with robust fallback ---
+        async function openCamera() {
+            // If API not available, fall back immediately
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                addMessage('<div class="p-2 text-sm text-red-700 bg-red-50 rounded">Aapke browser mein camera API available nahi hai. Kripya photo upload ya fallback option se photo lein.</div>');
+                cameraFallbackInput.click();
+                return;
+            }
+
+            cameraModal.classList.remove('hidden');
+            captureBtn.disabled = true; captureBtn.classList.add('disabled');
+
+            try {
+                cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+                cameraFeed.srcObject = cameraStream;
+
+                // When metadata is loaded, enable capture button
+                const onMeta = () => {
+                    try { cameraFeed.play(); } catch(e) { /* ignore */ }
+                    captureBtn.disabled = false; captureBtn.classList.remove('disabled');
+                    cameraFeed.removeEventListener('loadedmetadata', onMeta);
+                };
+                cameraFeed.addEventListener('loadedmetadata', onMeta);
+
+                // Also handle cases where stream is ready but 'loadedmetadata' didn't fire
+                setTimeout(() => {
+                    if (cameraFeed.videoWidth > 0 && cameraFeed.videoHeight > 0) {
+                        captureBtn.disabled = false; captureBtn.classList.remove('disabled');
+                    }
+                }, 700);
+
+            } catch (err) {
+                // Provide clear UX & fallback to file input / mobile capture
+                console.error('Camera access error:', err);
+                const name = err && err.name ? err.name : 'UnknownError';
+                const message = err && err.message ? err.message : '';
+                addMessage(`<div class="p-2 text-sm text-red-700 bg-red-50 rounded"><strong>Camera error:</strong> ${name} - ${message}.\nAksar karan: browser permissions denied, non-secure page (HTTPS required), ya device par camera nahi hai. Kripya permissions enable karein ya fallback se photo upload karein.</div>`);
+                cameraModal.classList.add('hidden');
+                // Give user a fallback method to capture photo (mobile or file picker)
+                setTimeout(() => cameraFallbackInput.click(), 250);
+            }
+        }
+
+        function closeCamera() {
+            try {
+                if (cameraStream) {
+                    cameraStream.getTracks().forEach(t => t.stop());
+                }
+            } catch (e) {
+                console.warn('Error stopping camera stream', e);
+            }
+            cameraFeed.srcObject = null;
+            cameraModal.classList.add('hidden');
+            captureBtn.disabled = true; captureBtn.classList.add('disabled');
+        }
+
+        function capturePhoto() {
+            // Ensure video has valid dimensions
+            if (!cameraFeed || cameraFeed.videoWidth === 0 || cameraFeed.videoHeight === 0) {
+                addMessage('<div class="p-2 text-sm text-amber-700 bg-amber-50 rounded">Camera ready nahi hai. Kripya thodi der baad dobara koshish karein.</div>');
+                return;
+            }
+            const context = photoCanvas.getContext('2d');
+            photoCanvas.width = cameraFeed.videoWidth;
+            photoCanvas.height = cameraFeed.videoHeight;
+            context.drawImage(cameraFeed, 0, 0, photoCanvas.width, photoCanvas.height);
+            const imageUrl = photoCanvas.toDataURL('image/jpeg');
+            processImage(imageUrl);
+            closeCamera();
+        }
+
+        // Image handling (uploads + fallback)
+        function processImage(imageUrl) {
+            imagePreview.src = imageUrl; analysisPreview.src = imageUrl; imagePreview.classList.remove('hidden'); uploadIcon.classList.add('hidden');
+            uploadArea.classList.add('hidden'); analysisInProgressArea.classList.remove('hidden');
+            showLoading(); setTimeout(runAnalysis, 1200);
+        }
+
+        uploadBtn.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return; const reader = new FileReader();
+            reader.onload = (ev) => processImage(ev.target.result);
+            reader.readAsDataURL(file);
+        });
+
+        cameraFallbackInput.addEventListener('change', (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return; const reader = new FileReader();
+            reader.onload = (ev) => processImage(ev.target.result);
+            reader.readAsDataURL(file);
+        });
+
+        openCameraBtn.addEventListener('click', openCamera);
+        closeCameraBtn.addEventListener('click', closeCamera);
+        captureBtn.addEventListener('click', capturePhoto);
+
+        // If user navigates away or modal closes, ensure camera stopped
+        window.addEventListener('beforeunload', closeCamera);
+
+        // --- Chatbot and UI functions (kept from previous version but tidy) ---
+        function runAnalysis() {
+            clearLoading();
+            const issues = Object.keys(skinIssuesData);
+            const randomIssue = issues[Math.floor(Math.random()*issues.length)];
+            analysisResult.issue = randomIssue;
+            addMessage(`\n                <h3 class=\"font-semibold text-emerald-800\">Analysis poora hua!</h3>\n                <p class=\"mt-1\">Mujhe is taraf sanket mil raha hai: <strong class=\"text-emerald-700\">${randomIssue}</strong>.</p>\n                <p class=\"text-sm mt-2\">${skinIssuesData[randomIssue].description}</p>\n            `);
+            showButtons([
+                { text: "✨ Ayurvedic Insights Batayein", action: generateAyurvedicInsights },
+                { text: "Seedhe Sujhav Batayein", action: () => {
+                    addMessage("Aapko sabse achhe sujhav dene ke liye, main aapke sharir ke prakriti (*dosha*) ke anusaar Ayurvedic upchar bhi bata sakta hoon. Kya aap apne dominant dosha ko janne ke liye kuch sawalon ke jawab dena chahenge?");
+                    showButtons([
+                        { text: "Haan, mera Dosha batayein", action: startQuiz },
+                        { text: "Nahi, sirf basic tips dein", action: () => displayResults(analysisResult.issue, null) }
+                    ]);
+                }}
+            ]);
+        }
+
+        function addMessage(content, isUser = false) {
+            clearLoading();
+            const bubble = document.createElement('div');
+            bubble.className = `chat-bubble max-w-md p-3 rounded-lg ${isUser ? 'bg-emerald-600 text-white self-end' : 'bg-white shadow-sm'}`;
+            bubble.innerHTML = content;
+            chatWindow.appendChild(bubble);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+
+        function showLoading() {
+            clearLoading();
+            const bubble = document.createElement('div');
+            bubble.className = 'chat-bubble max-w-md p-3 rounded-lg bg-white shadow-sm';
+            bubble.innerHTML = `<div class="flex items-center space-x-2"><div class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div><p>Soch raha hoon...</p><div class="loading-dots"><span>.</span><span>.</span><span>.</span></div></div>`;
+            chatWindow.appendChild(bubble); chatWindow.scrollTop = chatWindow.scrollHeight; lastLoadingBubble = bubble;
+        }
+
+        function clearInput() { chatInputArea.innerHTML = ''; }
+
+        function showButtons(buttons) {
+            clearInput();
+            const wrapper = document.createElement('div'); wrapper.className = 'flex flex-wrap gap-2';
+            buttons.forEach(btn => {
+                const buttonEl = document.createElement('button');
+                buttonEl.innerHTML = btn.text; buttonEl.className = 'bg-white border border-emerald-300 text-emerald-800 font-medium py-2 px-4 rounded-lg hover:bg-emerald-100 transition-colors duration-200';
+                buttonEl.onclick = () => { btn.action(); wrapper.querySelectorAll('button').forEach(b => b.disabled = true); };
+                wrapper.appendChild(buttonEl);
+            });
+            chatInputArea.appendChild(wrapper);
+        }
+
+        function startQuiz() { addMessage("Theek hai! Shuru karte hain.", true); clearInput(); currentQuizQuestion = 0; quizAnswers = {}; askQuizQuestion(); }
+        function askQuizQuestion() {
+            if (currentQuizQuestion >= quizQuestions.length) { finishQuiz(); return; }
+            const q = quizQuestions[currentQuizQuestion]; addMessage(q.question);
+            const buttons = Object.entries(q.options).map(([dosha, text]) => ({ text, action: () => handleQuizAnswer(dosha) }));
+            showButtons(buttons);
+        }
+        function handleQuizAnswer(dosha) { const q = quizQuestions[currentQuizQuestion]; const selectedText = q.options[dosha]; addMessage(selectedText, true); quizAnswers[dosha] = (quizAnswers[dosha] || 0) + 1; currentQuizQuestion++; setTimeout(askQuizQuestion, 400); }
+
+        function finishQuiz() { let dominantDosha = "Vata"; let maxScore = 0; for (const dosha in quizAnswers) { if (quizAnswers[dosha] > maxScore) { maxScore = quizAnswers[dosha]; dominantDosha = dosha; } } analysisResult.dosha = dominantDosha; addMessage(`Dhanyavaad. Aapke jawabon ke aadhar par, aapki dominant prakriti <strong class="text-emerald-700">${dominantDosha}</strong> lagti hai. Yeh mujhe aapke liye Ayurvedic upcharon ko behtar banane mein madad karega.`); setTimeout(() => displayResults(analysisResult.issue, analysisResult.dosha), 700); }
+
+        function displayResults(issue, dosha) {
+            const data = skinIssuesData[issue]; clearInput();
+
+            let productsHtml = `<div class="bg-white p-4 rounded-lg shadow-sm"><h4 class="font-bold text-emerald-800 mb-2">Modern Skincare Sujhav</h4><ul class="list-disc list-inside text-sm space-y-1">`;
+            data.products.forEach(p => { productsHtml += `<li>${p}</li>`; }); productsHtml += `</ul></div>`; addMessage(productsHtml);
+
+            let remediesHtml = `<div class="bg-white p-4 rounded-lg shadow-sm"><h4 class="font-bold text-emerald-800 mb-2">Ayurvedic Gharelu Nuskhe</h4><div class="space-y-3 text-sm">`;
+            data.remedies.forEach(r => {
+                const escapedName = r.name.replace(/'/g, "\\'");
+                remediesHtml += `\n                    <div class=\"remedy-item\">\n                        <div>\n                            <strong class=\"text-emerald-700\">${r.name}:</strong> ${r.desc}\n                        </div>\n                        <div class=\"flex gap-2\">\n                            <button class=\"youtube-btn small-btn\" onclick=\"embedYoutubeShort('${escapedName}')\">Embed Shorts</button>\n                            <button class=\"youtube-btn small-btn\" onclick=\"searchYoutubeShort('${escapedName}')\">Shorts Dekhein</button>\n                            <button class=\"youtube-btn small-btn\" onclick=\"toggleSaveRemedy('${escapedName}')\">❤️ Save</button>\n                        </div>\n                    </div>`;
+            });
+            remediesHtml += `</div></div>`; addMessage(remediesHtml);
+
+            if (data.databaseRemedies && data.databaseRemedies.length > 0) {
+                let dbRemediesHtml = `<div class=\"bg-white p-4 rounded-lg shadow-sm\"><h4 class=\"font-bold text-emerald-800 mb-2\">Classical Ayurvedic Formulations</h4><p class=\"text-xs text-gray-500 mb-2\">Yeh classical formulations hain. Kripya istemal se pehle kisi Ayurvedic practitioner se salah lein.</p><div class=\"space-y-3 text-sm\">`;
+                data.databaseRemedies.forEach(r => { const escapedRemedy = r.replace(/'/g, "\\'"); dbRemediesHtml += `\n                        <div class=\"remedy-item\">\n                            <span>• ${r}</span>\n                            <div class=\"flex gap-2\">\n                                <button class=\"youtube-btn small-btn\" onclick=\"embedYoutubeShort('${escapedRemedy}')\">Embed</button>\n                                <button class=\"youtube-btn small-btn\" onclick=\"searchYoutubeShort('${escapedRemedy}')\">Shorts</button>\n                            </div>\n                        </div>`; });
+                dbRemediesHtml += `</div></div>`; addMessage(dbRemediesHtml);
+            }
+
+            if (data.lifestyleTips && data.lifestyleTips.length > 0) {
+                let lifestyleHtml = `<div class=\"bg-white p-4 rounded-lg shadow-sm\"><h4 class=\"font-bold text-emerald-800 mb-2\">Lifestyle Tips 🌱</h4><ul class=\"list-disc list-inside text-sm space-y-1\">`;
+                data.lifestyleTips.forEach(t => { lifestyleHtml += `<li>${t}</li>`; }); lifestyleHtml += `</ul></div>`; addMessage(lifestyleHtml);
+            }
+
+            const downloadButtonHtml = `<div class=\"mt-2\"><button class=\"youtube-btn small-btn\" onclick=\"downloadPDF('${issue}', ${JSON.stringify(data.remedies).replace(/'/g, "\\'")})\">Download Remedies (PDF)</button> <button class=\"youtube-btn small-btn\" onclick=\"showSavedRemedies()\">Saved Remedies ❤️</button></div>`;
+            addMessage(downloadButtonHtml);
+
+            if (dosha) { showButtons([{ text: "✨ Mera Personalized Plan Banayein", action: generatePersonalizedPlan }]); } else { showGeneralTips(); }
+        }
+
+        function showGeneralTips() {
+            addMessage(`\n                <div class=\"bg-white p-4 rounded-lg shadow-sm\">\n                    <h4 class=\"font-bold text-emerald-800 mb-2\">Baal aur Sharir ke liye General Tips</h4>\n                    <ul class=\"list-disc list-inside text-sm space-y-1\">\n                        <li><strong>Baal:</strong> Hafte mein ek baar nariyal ya til ke tel se scalp ki massage (Abhyanga) karein. Isse jado ko poshan milta hai aur mann shaant hota hai.</li>\n                        <li><strong>Sharir:</strong> Skin health ke liye circulation zaroori hai. Halka yoga ya stretching shamil karein.</li>\n                        <li><strong>Aahar:</strong> Taaze, poore bhojan par dhyan dein aur hydrated rahein. Ayurveda ke anusaar, achha pachan hi chamakti twacha ki kunji hai.</li>\n                    </ul>\n                </div>\n            `);
+        }
+
+        function showSavedRemedies() {
+            const key = 'ayus_saved_remedies_v1'; let saved = JSON.parse(localStorage.getItem(key) || '[]');
+            if (!saved.length) { addMessage('<div class="p-2 text-sm text-gray-700 bg-gray-50 rounded">Koi saved remedy nahi mili.</div>'); return; }
+            let html = `<div class=\"bg-white p-4 rounded-lg shadow-sm\"><h4 class=\"font-bold text-emerald-800 mb-2\">Aapke Saved Remedies</h4><ul class=\"list-disc list-inside text-sm\">`;
+            saved.forEach(s => html += `<li>${s}</li>`); html += `</ul></div>`; addMessage(html);
+        }
+
+        // Initial message
+        addMessage("AyusKARA mein aapka swagat hai! Main Ayurveda ke madhyam se aapki skin ko samajhne mein madad karne ke liye yahan hoon. Shuru karne ke liye kripya ek photo upload karein ya lein.");
+
+        // Expose some functions to global for inline onclicks
+        window.openCamera = openCamera; window.closeCamera = closeCamera; window.capturePhoto = capturePhoto;
+        window.handleImageUpload = (e) => { const file = e.target.files && e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (ev) => processImage(ev.target.result); reader.readAsDataURL(file); };
+        window.searchYoutubeShort = searchYoutubeShort; window.embedYoutubeShort = embedYoutubeShort;
+        window.toggleSaveRemedy = toggleSaveRemedy; window.downloadPDF = downloadPDF; window.showSavedRemedies = showSavedRemedies;
+    });
+    </script>
+</body>
+</html>
